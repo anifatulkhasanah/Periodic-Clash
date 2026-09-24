@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Periodic Table Drag & Drop</title>
+<style>
+  :root{
+    --bg:#f6f8fc;
+    --card:#ffffff;
+    --line:#cbd5e1;
+    --text:#172033;
+    --muted:#64748b;
+    --accent:#2563eb;
+    --success:#16a34a;
+    --danger:#dc2626;
+    --cell:58px;
+    --gap:4px;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+    background:linear-gradient(135deg,#eef4ff 0%,#f8fafc 45%,#f4f7fb 100%);
+    color:var(--text);
+    min-height:100vh;
+  }
+  header{
+    padding:24px 28px 16px;
+    max-width:1500px;
+    margin:auto;
+  }
+  h1{margin:0 0 6px;font-size:28px}
+  header p{margin:0;color:var(--muted)}
+  .toolbar{
+    max-width:1500px;margin:0 auto 18px;padding:0 28px;
+    display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+  }
+  button{
+    border:0;border-radius:10px;padding:10px 15px;font-weight:700;
+    cursor:pointer;background:#e2e8f0;color:#172033;
+  }
+  button.primary{background:var(--accent);color:white}
+  .score{
+    margin-left:auto;background:white;border:1px solid #e2e8f0;
+    border-radius:12px;padding:9px 14px;font-weight:700;
+  }
+  .layout{
+    max-width:1500px;margin:auto;padding:0 28px 32px;
+    display:grid;grid-template-columns:minmax(760px,1fr) 330px;gap:20px;
+  }
+  .panel{
+    background:rgba(255,255,255,.88);border:1px solid #e2e8f0;
+    border-radius:18px;padding:18px;box-shadow:0 8px 30px rgba(15,23,42,.06);
+  }
+  .panel-title{font-weight:800;margin-bottom:14px}
+  .table-wrap{overflow:auto;padding-bottom:8px}
+  .periodic{
+    display:grid;
+    grid-template-columns:repeat(18,var(--cell));
+    grid-template-rows:repeat(7,var(--cell));
+    gap:var(--gap);
+    min-width:1110px;
+    align-items:stretch;
+  }
+  .cell{
+    width:var(--cell);height:var(--cell);border:1.5px dashed #b8c3d3;
+    border-radius:8px;background:#fbfdff;position:relative;
+    display:flex;align-items:center;justify-content:center;
+    transition:.15s;
+  }
+  .cell.drop-hover{background:#dbeafe;border-color:#2563eb;transform:scale(1.04)}
+  .cell.correct{background:#dcfce7;border:2px solid #22c55e}
+  .cell.wrong{animation:shake .25s;background:#fee2e2;border-color:#ef4444}
+  .atomic{
+    position:absolute;top:3px;left:5px;font-size:8px;color:#94a3b8;
+  }
+  .element{
+    user-select:none;cursor:grab;width:100%;height:100%;
+    border-radius:7px;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;line-height:1.05;
+    border:1px solid rgba(15,23,42,.10);
+    box-shadow:0 2px 5px rgba(15,23,42,.08);
+  }
+  .element:active{cursor:grabbing}
+  .symbol{font-size:22px;font-weight:800}
+  .name{font-size:8px;margin-top:3px;max-width:54px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .bank{
+    display:grid;grid-template-columns:repeat(4,1fr);gap:8px;
+    max-height:620px;overflow:auto;padding-right:4px;
+  }
+  .bank .element{height:62px}
+  .bank .symbol{font-size:20px}
+  .bank .name{font-size:8px}
+  .legend{margin-top:14px;display:flex;flex-wrap:wrap;gap:7px;font-size:11px;color:#475569}
+  .legend span{display:flex;align-items:center;gap:5px}
+  .dot{width:11px;height:11px;border-radius:3px;border:1px solid rgba(0,0,0,.08)}
+  .hint{
+    margin-top:12px;padding:11px 12px;border-radius:10px;
+    background:#eff6ff;color:#1e40af;font-size:12px;line-height:1.5;
+  }
+  .status{font-size:12px;color:var(--muted);margin-top:10px;min-height:18px}
+  .fblock{
+    margin-top:15px;display:flex;flex-direction:column;gap:4px;
+  }
+  .frow{
+    display:grid;grid-template-columns:repeat(14,var(--cell));gap:var(--gap);
+    margin-left:calc((var(--cell) + var(--gap)) * 3);
+    min-width:866px;
+  }
+  .f-label{display:none}
+  .empty-note{
+    color:#94a3b8;font-size:10px;text-align:center;padding:10px 0;
+  }
+  @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+  @media(max-width:1150px){
+    .layout{grid-template-columns:1fr}
+    .bank{max-height:380px}
+    .score{margin-left:0}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>🧪 Periodic Clash</h1>
+  <p>Susun unsur ke posisi yang benar pada tabel periodik.</p>
+</header>
+
+<div class="toolbar">
+  <button class="primary" id="shuffleBtn">🔀 Acak Unsur</button>
+  <button id="resetBtn">↺ Reset</button>
+  <button id="showBtn">💡 Tampilkan Jawaban</button>
+  <div class="score">Benar: <span id="correct">0</span> / 118</div>
+</div>
+
+<main class="layout">
+  <section class="panel">
+    <div class="panel-title">Tabel Periodik</div>
+    <div class="table-wrap">
+      <div class="periodic" id="periodic"></div>
+      <div class="fblock">
+        <div class="frow" id="lanthanides"></div>
+        <div class="frow" id="actinides"></div>
+      </div>
+    </div>
+    <div class="legend" id="legend"></div>
+    <div class="status" id="status"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="panel-title">Unsur yang harus ditempatkan</div>
+    <div class="bank" id="bank"></div>
+    <div class="hint">
+      <b>Cara bermain:</b> tekan dan tahan unsur, lalu seret ke kotak yang sesuai.
+      Jika benar, unsur akan terkunci. Jika salah, unsur kembali ke daftar.
+    </div>
+  </aside>
+</main>
+
+<script>
+const elements = [
+["H","Hidrogen",1,1,1,"nonmetal"],["He","Helium",2,1,18,"noble"],
+["Li","Litium",3,2,1,"alkali"],["Be","Berilium",4,2,2,"alkaline"],
+["B","Boron",5,2,13,"metalloid"],["C","Karbon",6,2,14,"nonmetal"],["N","Nitrogen",7,2,15,"nonmetal"],["O","Oksigen",8,2,16,"nonmetal"],["F","Fluorin",9,2,17,"halogen"],["Ne","Neon",10,2,18,"noble"],
+["Na","Natrium",11,3,1,"alkali"],["Mg","Magnesium",12,3,2,"alkaline"],["Al","Aluminium",13,3,13,"post"],["Si","Silikon",14,3,14,"metalloid"],["P","Fosfor",15,3,15,"nonmetal"],["S","Sulfur",16,3,16,"nonmetal"],["Cl","Klorin",17,3,17,"halogen"],["Ar","Argon",18,3,18,"noble"],
+["K","Kalium",19,4,1,"alkali"],["Ca","Kalsium",20,4,2,"alkaline"],["Sc","Skandium",21,4,3,"transition"],["Ti","Titanium",22,4,4,"transition"],["V","Vanadium",23,4,5,"transition"],["Cr","Kromium",24,4,6,"transition"],["Mn","Mangan",25,4,7,"transition"],["Fe","Besi",26,4,8,"transition"],["Co","Kobalt",27,4,9,"transition"],["Ni","Nikel",28,4,10,"transition"],["Cu","Tembaga",29,4,11,"transition"],["Zn","Seng",30,4,12,"transition"],["Ga","Galium",31,4,13,"post"],["Ge","Germanium",32,4,14,"metalloid"],["As","Arsen",33,4,15,"metalloid"],["Se","Selenium",34,4,16,"nonmetal"],["Br","Bromin",35,4,17,"halogen"],["Kr","Kripton",36,4,18,"noble"],
+["Rb","Rubidium",37,5,1,"alkali"],["Sr","Stronsium",38,5,2,"alkaline"],["Y","Itrium",39,5,3,"transition"],["Zr","Zirkonium",40,5,4,"transition"],["Nb","Niobium",41,5,5,"transition"],["Mo","Molibdenum",42,5,6,"transition"],["Tc","Teknesium",43,5,7,"transition"],["Ru","Rutenium",44,5,8,"transition"],["Rh","Rodium",45,5,9,"transition"],["Pd","Paladium",46,5,10,"transition"],["Ag","Perak",47,5,11,"transition"],["Cd","Kadmium",48,5,12,"transition"],["In","Indium",49,5,13,"post"],["Sn","Timah",50,5,14,"post"],["Sb","Antimon",51,5,15,"metalloid"],["Te","Telurium",52,5,16,"metalloid"],["I","Iodin",53,5,17,"halogen"],["Xe","Xenon",54,5,18,"noble"],
+["Cs","Sesium",55,6,1,"alkali"],["Ba","Barium",56,6,2,"alkaline"],["La","Lantanum",57,6,3,"lanth"],["Hf","Hafnium",72,6,4,"transition"],["Ta","Tantalum",73,6,5,"transition"],["W","Wolfram",74,6,6,"transition"],["Re","Renium",75,6,7,"transition"],["Os","Osmium",76,6,8,"transition"],["Ir","Iridium",77,6,9,"transition"],["Pt","Platina",78,6,10,"transition"],["Au","Emas",79,6,11,"transition"],["Hg","Merkuri",80,6,12,"transition"],["Tl","Talium",81,6,13,"post"],["Pb","Timbal",82,6,14,"post"],["Bi","Bismut",83,6,15,"post"],["Po","Polonium",84,6,16,"post"],["At","Astatin",85,6,17,"halogen"],["Rn","Radon",86,6,18,"noble"],
+["Fr","Fransium",87,7,1,"alkali"],["Ra","Radium",88,7,2,"alkaline"],["Ac","Aktinium",89,7,3,"actin"],["Rf","Rutherfordium",104,7,4,"transition"],["Db","Dubnium",105,7,5,"transition"],["Sg","Seaborgium",106,7,6,"transition"],["Bh","Bohrium",107,7,7,"transition"],["Hs","Hassium",108,7,8,"transition"],["Mt","Meitnerium",109,7,9,"transition"],["Ds","Darmstadtium",110,7,10,"transition"],["Rg","Roentgenium",111,7,11,"transition"],["Cn","Kopernisium",112,7,12,"transition"],["Nh","Nihonium",113,7,13,"post"],["Fl","Flerovium",114,7,14,"post"],["Mc","Moscovium",115,7,15,"post"],["Lv","Livermorium",116,7,16,"post"],["Ts","Tenesin",117,7,17,"halogen"],["Og","Oganeson",118,7,18,"noble"],
+["Ce","Serium",58,8,4,"lanth"],["Pr","Praseodimium",59,8,5,"lanth"],["Nd","Neodimium",60,8,6,"lanth"],["Pm","Prometium",61,8,7,"lanth"],["Sm","Samarium",62,8,8,"lanth"],["Eu","Europium",63,8,9,"lanth"],["Gd","Gadolinium",64,8,10,"lanth"],["Tb","Terbium",65,8,11,"lanth"],["Dy","Disprosium",66,8,12,"lanth"],["Ho","Holmium",67,8,13,"lanth"],["Er","Erbium",68,8,14,"lanth"],["Tm","Tulium",69,8,15,"lanth"],["Yb","Iterbium",70,8,16,"lanth"],["Lu","Lutesium",71,8,17,"lanth"],
+["Th","Torium",90,9,4,"actin"],["Pa","Protaktinium",91,9,5,"actin"],["U","Uranium",92,9,6,"actin"],["Np","Neptunium",93,9,7,"actin"],["Pu","Plutonium",94,9,8,"actin"],["Am","Amerisium",95,9,9,"actin"],["Cm","Kurium",96,9,10,"actin"],["Bk","Berkelium",97,9,11,"actin"],["Cf","Kalifornium",98,9,12,"actin"],["Es","Einsteinium",99,9,13,"actin"],["Fm","Fermium",100,9,14,"actin"],["Md","Mendelevium",101,9,15,"actin"],["No","Nobelium",102,9,16,"actin"],["Lr","Lawrensium",103,9,17,"actin"]
+];
+
+const colors = {
+  alkali:"#fee2e2", alkaline:"#fef3c7", transition:"#ede9fe",
+  post:"#dcfce7", metalloid:"#fef9c3", nonmetal:"#dbeafe",
+  halogen:"#e0e7ff", noble:"#fce7f3", lanth:"#ffedd5", actin:"#fed7aa"
+};
+const labels = {
+  alkali:"Logam alkali", alkaline:"Alkali tanah", transition:"Logam transisi",
+  post:"Logam pascatransisi", metalloid:"Metaloid", nonmetal:"Nonlogam",
+  halogen:"Halogen", noble:"Gas mulia", lanth:"Lantanida", actin:"Aktinida"
+};
+
+const periodic = document.getElementById("periodic");
+const bank = document.getElementById("bank");
+const lanths = document.getElementById("lanthanides");
+const acts = document.getElementById("actinides");
+let placed = new Set();
+let dragged = null;
+
+function makeElement(el){
+  const [symbol,name,num,period,group,cat] = el;
+  const d = document.createElement("div");
+  d.className = "element";
+  d.draggable = true;
+  d.dataset.num = num;
+  d.style.background = colors[cat];
+  d.innerHTML = `<span class="symbol">${symbol}</span><span class="name">${name}</span>`;
+  d.title = `${symbol} — ${name} (${num})`;
+  d.addEventListener("dragstart", e=>{
+    dragged = num;
+    e.dataTransfer.setData("text/plain", String(num));
+    e.dataTransfer.effectAllowed = "move";
+    d.style.opacity = ".45";
+  });
+  d.addEventListener("dragend", ()=>{d.style.opacity="1";dragged=null});
+  return d;
+}
+
+function buildTable(){
+  periodic.innerHTML="";
+
+  // 7 periods × 18 groups, but only real element positions are shown.
+  // This keeps the visual shape of the actual periodic table.
+  for(let p=1;p<=7;p++){
+    for(let g=1;g<=18;g++){
+      const hasElement = elements.some(e => e[3]===p && e[4]===g && e[5] !== "lanth" && e[5] !== "actin");
+      if(!hasElement) continue;
+
+      const cell=document.createElement("div");
+      cell.className="cell";
+      cell.style.gridColumn=g;
+      cell.style.gridRow=p;
+      cell.dataset.period=p;
+      cell.dataset.group=g;
+
+      cell.addEventListener("dragover",e=>{
+        e.preventDefault();
+        cell.classList.add("drop-hover");
+      });
+      cell.addEventListener("dragleave",()=>cell.classList.remove("drop-hover"));
+      cell.addEventListener("drop",e=>{
+        e.preventDefault();
+        cell.classList.remove("drop-hover");
+        const num=Number(e.dataTransfer.getData("text/plain")||dragged);
+        placeElement(num,cell);
+      });
+      periodic.appendChild(cell);
+    }
+  }
+
+  // f-block: exactly like the conventional periodic table presentation.
+  [lanths,acts].forEach((row,i)=>{
+    row.innerHTML="";
+    for(let j=0;j<14;j++){
+      const cell=document.createElement("div");
+      cell.className="cell";
+      cell.dataset.f = i===0 ? "lanth" : "actin";
+      cell.dataset.findex=j;
+      cell.addEventListener("dragover",e=>{e.preventDefault();cell.classList.add("drop-hover")});
+      cell.addEventListener("dragleave",()=>cell.classList.remove("drop-hover"));
+      cell.addEventListener("drop",e=>{
+        e.preventDefault();
+        cell.classList.remove("drop-hover");
+        const num=Number(e.dataTransfer.getData("text/plain")||dragged);
+        placeFElement(num,cell,i);
+      });
+      row.appendChild(cell);
+    }
+  });
+}
+
+function placeElement(num,cell){
+  const el=elements.find(x=>x[2]===num);
+  if(!el || placed.has(num)) return;
+  const [,name,,period,group,cat]=el;
+  if(period<=7 && group===Number(cell.dataset.group) && period===Number(cell.dataset.period) && !cell.firstChild){
+    const node=makeElement(el);
+    cell.appendChild(node);
+    cell.classList.add("correct");
+    placed.add(num);
+    removeFromBank(num);
+    updateScore();
+    if(placed.size===118) finish();
+  }else{
+    cell.classList.add("wrong");
+    setTimeout(()=>cell.classList.remove("wrong"),280);
+    setStatus("Belum tepat. Coba cari periode dan golongannya lagi.");
+  }
+}
+
+function placeFElement(num,cell,rowIndex){
+  const el=elements.find(x=>x[2]===num);
+  if(!el || placed.has(num) || cell.firstChild) return;
+  const expectedCat=rowIndex===0?"lanth":"actin";
+  if(el[5]===expectedCat && ((rowIndex===0 && num>=58&&num<=71)||(rowIndex===1&&num>=90&&num<=103))){
+    cell.appendChild(makeElement(el));
+    cell.classList.add("correct");
+    placed.add(num); removeFromBank(num); updateScore();
+    if(placed.size===118) finish();
+  }else{
+    cell.classList.add("wrong");
+    setTimeout(()=>cell.classList.remove("wrong"),280);
+    setStatus("Unsur ini bukan bagian dari baris tersebut.");
+  }
+}
+
+function removeFromBank(num){
+  const item=bank.querySelector(`[data-num="${num}"]`);
+  if(item) item.remove();
+}
+
+function populateBank(shuffle=true){
+  bank.innerHTML="";
+  let arr=elements.filter(e=>!placed.has(e[2]));
+  if(shuffle) arr.sort(()=>Math.random()-.5);
+  arr.forEach(e=>bank.appendChild(makeElement(e)));
+}
+
+function updateScore(){document.getElementById("correct").textContent=placed.size}
+function setStatus(t){document.getElementById("status").textContent=t}
+function reset(){
+  placed.clear(); buildTable(); populateBank(true); updateScore();
+  setStatus("Semua unsur dikembalikan ke daftar.");
+}
+function shuffle(){populateBank(true);setStatus("Unsur diacak.");}
+function finish(){
+  setStatus("🎉 Hebat! Semua 118 unsur sudah ditempatkan dengan benar.");
+  alert("Selamat! Semua 118 unsur berhasil ditempatkan.");
+}
+function showAnswers(){
+  // Put all remaining elements directly into their correct cells.
+  elements.filter(e=>!placed.has(e[2])).forEach(e=>{
+    const [,,num,period,group,cat]=e;
+    if(cat==="lanth" || cat==="actin") return;
+    const cell=[...periodic.children].find(c=>Number(c.dataset.period)===period&&Number(c.dataset.group)===group);
+    if(cell && !cell.firstChild){
+      cell.appendChild(makeElement(e)); cell.classList.add("correct"); placed.add(num);
+      removeFromBank(num);
+    }
+  });
+  elements.filter(e=>!placed.has(e[2])).forEach(e=>{
+    const [,,num,,,cat]=e;
+    if(cat!=="lanth" && cat!=="actin") return;
+
+    // Lantanida: Ce-Lu menempati indeks 0-13.
+    // Aktinida: Th-Lr menempati indeks 0-13.
+    // La dan Ac sudah memiliki kotak tersendiri pada tabel utama.
+    const row = cat==="lanth" ? lanths : acts;
+    const index = cat==="lanth" ? num-58 : num-90;
+    const cell = row.querySelector(`[data-findex="${index}"]`);
+
+    if(cell && !cell.firstChild){
+      cell.appendChild(makeElement(e));
+      cell.classList.add("correct");
+      placed.add(num);
+      removeFromBank(num);
+    }
+  });
+  updateScore(); setStatus("Jawaban ditampilkan. Tekan Reset untuk mencoba lagi.");
+}
+
+document.getElementById("shuffleBtn").onclick=shuffle;
+document.getElementById("resetBtn").onclick=reset;
+document.getElementById("showBtn").onclick=showAnswers;
+
+buildTable();
+populateBank(true);
+updateScore();
+
+// Legend
+const legend=document.getElementById("legend");
+Object.entries(labels).forEach(([key,label])=>{
+  const s=document.createElement("span");
+  s.innerHTML=`<i class="dot" style="background:${colors[key]}"></i>${label}`;
+  legend.appendChild(s);
+});
+</script>
+</body>
+</html>
